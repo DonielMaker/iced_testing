@@ -2,9 +2,8 @@ use iced::widget::{text, Text, Column, column, text_input, button, Button, row, 
 
 pub fn main() -> iced::Result {
     // iced::run("A cool counter", Counter::update, Counter::view)
-    // iced::run("Todo List", TodoList::update, TodoList::view)
-    // iced::run("Single Task", Task::update, Task::view)
-    iced::application("Single Task", Task::update, Task::view).theme(|_| iced::Theme::CatppuccinMacchiato).run()
+    // iced::application("Single Task", Task::update, Task::view).theme(|_| iced::Theme::CatppuccinMacchiato).run()
+    iced::application("Single Task", State::update, State::view).theme(|_| iced::Theme::CatppuccinMacchiato).run()
 }
 
 // #[derive(Default)]
@@ -41,122 +40,70 @@ pub fn main() -> iced::Result {
 //     }
 // }
 
-enum StateMessage {
-    Add,
-    Remove,
-    Input
-}
-
-#[derive(Debug, Clone)]
-enum TaskMessage {
-    Edit(String)
-}
-struct State {
-    search: String,
-    todos: Vec<Task>,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 struct Task {
     content: String,
     id: uuid::Uuid,
 }
 
-impl Default for Task {
-    fn default() -> Self {
-        Self {
-            content: String::from("This is a new Task"),
-            id: uuid::Uuid::new_v4()
-        }
-    }
-}
-
 impl Task {
-    fn update(&mut self, message: TaskMessage) {
+    fn update(&mut self, message: Message) {
         match message {
-            TaskMessage::Edit(new_content) => {
+            Message::Edit(new_content) => {
                 self.content = new_content; 
             }
+            _ => {}
         }
     }
 
-    fn view(&self) -> Row<TaskMessage>{
-        let text = text(&self.content).width(iced::Length::Fill).align_x(iced::Center).align_y(iced::Center);
+    fn view(&self) -> iced::Element<Message> {
+        let content = text_input("", &self.content).width(iced::Length::Fixed(400.0)).on_input(Message::Edit);
 
-        row![text, button("del")]
+        let del = button("del").on_press(Message::Remove(self.id));
+
+        row![content, del].into()
     }
 }
 
-// #[derive(Debug, Clone)]
-// enum Message {
-//     Add(String),
-//     Remove(i32),
-//     Input(String),
-// }
-//
-// #[derive(Default)]
-// struct TodoList {
-//     search: String,
-//     items: Vec<(String, i32)>, 
-// }
-//
-//
-// impl TodoList {
-//     fn add(&mut self, text: String) {
-//         self.update(Message::Add(text))
-//     }
-//
-//     fn remove(&mut self, id: i32) {
-//         self.update(Message::Remove(id))
-//     }
-//
-//     fn update(&mut self, action: Message) {
-//         match action {
-//             Message::Add(text) => {
-//                 self.items.push((text, rand::random::<i32>()));
-//             }
-//             Message::Remove(id) => {
-//                 if let Some(index) = self.items.iter().position(|(_, x)| *x == id) {
-//                     self.items.remove(index);
-//                 }
-//             }
-//             Message::Input(search) => {
-//                 self.search = search;
-//             }
-//         } 
-//     }
-//
-//     fn view(&self) -> Column<Message>{
-//         let search_bar: iced::widget::TextInput<Message> = text_input("Search...", &self.search).on_input(Message::Input).on_submit(Message::Add(self.search.clone()));
-//
-//         let mut list: Column<Message> = Column::new();
-//         for item in self.items.clone() {
-//             let button: Button<Message> = button(item.0).on_press(Message::Remove(item.1));
-//             list = list.push(button)
-//         }
-//
-//
-//         column![
-//             search_bar,
-//             list
-//         ]
-//     }
-// }
+#[derive(Debug, Clone)]
+enum Message {
+    Add(String),
+    Remove(uuid::Uuid),
+    Input(String),
+    Edit(String),
+}
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn test() {
-//         let mut list = TodoList {search: String::new(), items: Vec::new()};
-//
-//         list.add("BlaBla".into());
-//
-//         assert_eq!("BlaBla", list.items[0].0);
-//
-//         list.remove(list.items[0].1);
-//
-//         assert!(list.items.is_empty());
-//     }
-// }
+#[derive(Default, Debug)]
+struct State {
+    search: String,
+    todos: Vec<Task>,
+}
+
+impl State {
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::Add(content) => {
+                self.todos.push(Task {content, id: uuid::Uuid::new_v4()}) 
+            }
+            Message::Remove(id) => {
+                if let Some(index) = self.todos.iter().position(|x| x.id == id) {
+                    self.todos.remove(index);
+                }
+            }
+            Message::Input(search) => {
+                self.search = search
+            }
+            _ => {}
+        }
+    }
+
+    fn view(&self) -> iced::Element<Message> {
+        let search_bar: iced::widget::TextInput<Message> = text_input("Search...", &self.search).on_input(Message::Input).on_submit(Message::Add(self.search.clone()));
+
+        let tasks: Vec<(usize, &Task)> = self.todos.iter().enumerate().map(|(i, task)| (i, task)).collect();
+
+        let tasks: iced::widget::keyed::Column<usize, Message> = iced::widget::keyed_column(tasks.iter().map(|(key, task)| (*key, task.view())));
+
+        column![search_bar, tasks].into()
+    }
+}
