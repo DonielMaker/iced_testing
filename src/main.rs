@@ -1,36 +1,21 @@
 use iced::widget::{text,  column, text_input, row, TextInput, button, keyed, keyed_column};
 
 pub fn main() -> iced::Result {
-    // iced::run("A cool counter", Counter::update, Counter::view)
-    // iced::application("Single Task", Task::update, Task::view).theme(|_| iced::Theme::CatppuccinMacchiato).run()
     iced::application("Single Task", State::update, State::view).theme(|_| iced::Theme::CatppuccinMacchiato).run()
 }
-
-// #[derive(Clone, Default, Debug)]
-// struct Task {
-//     content: String,
-//     id: uuid::Uuid,
-// }
-//
-// impl Task {
-//     fn view(&self) -> iced::Element<Message> {
-//         let content = text_input("", &self.content).width(iced::Length::Fixed(400.0)).on_input(Message::Edit());
-//
-//         let del = button("del").on_press(Message::Remove(self.id));
-//
-//         row![content, del].into()
-//     }
-// }
 
 #[derive(Debug, Clone)]
 enum Message {
     Add(String),
     Remove(usize),
     Input(String),
+    Search(String),
+    Change(usize, String),
 }
 
 #[derive(Default, Debug)]
 struct State {
+    input: String,
     search: String,
     todos: Vec<String>,
 }
@@ -44,24 +29,47 @@ impl State {
             Message::Remove(index) => {
                 self.todos.remove(index);
             }
-            Message::Input(search) => {
+            Message::Input(input) => {
+                self.input = input
+            }
+            Message::Search(search) => {
                 self.search = search
+            }
+            Message::Change(id, text) => {
+                self.todos[id] = text
             }
         }
     }
 
     fn view(&self) -> iced::Element<Message> {
-        let search_bar: TextInput<Message> = text_input("Search...", &self.search).on_input(Message::Input).on_submit(Message::Add(self.search.clone()));
+        let input_bar: TextInput<Message> = text_input("Enter new task...", &self.input).on_input(Message::Input).on_submit(Message::Add(self.input.clone()));
+        let search_bar: TextInput<Message> = text_input("Search...", &self.search).on_input(Message::Search);
 
-        let tasks: keyed::Column<usize, Message> = keyed_column(
-            self.todos
-                .iter()
-                .enumerate()
-                .map(|(key, task)| {
-                    (key, row![text(task).width(iced::Length::Fill), button("Del").on_press(Message::Remove(key))].into())
-                })
-        );
+        let tasks = get_tasks(self);
 
-        column![search_bar, tasks].into()
+        column![input_bar, search_bar, tasks].into()
     }
+}
+
+fn get_tasks(todo: &State) -> iced::Element<Message> {
+        if todo.search.is_empty() {
+            keyed_column(
+                todo.todos
+                    .iter()
+                    .enumerate()
+                    .map(|(key, task)| {
+                        (key, row![text_input("", task).width(iced::Length::Fill).on_input(move |text| Message::Change(key, text)), button("Del").on_press(Message::Remove(key))].into())
+                    })
+            ).into()
+        } else {
+            keyed_column(
+                todo.todos
+                    .iter()
+                    .filter(|x| x.contains(&todo.search))
+                    .enumerate()
+                    .map(|(key, task)| {
+                        (key, row![text_input("", task).width(iced::Length::Fill).on_input(move |text| Message::Change(key, text)), button("Del").on_press(Message::Remove(key))].into())
+                    })
+            ).into()
+        }
 }
